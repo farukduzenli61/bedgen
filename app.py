@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.background import BackgroundTask
 import pandas as pd
 from natsort import index_natsorted
 import numpy as np
@@ -346,7 +347,7 @@ async def read_root():
                     <textarea id="genes" placeholder="BRCA1, TP53, EGFR, ACTB&#10;veya&#10;BRCA1&#10;TP53&#10;EGFR&#10;ACTB"></textarea>
                 </div>
                 <button type="button" class="secondary" onclick="fetchPositions()">Pozisyonları Getir</button>
-            </div}
+            </div>
             <div id="loading" class="hidden">
                 <div class="spinner"></div>
                 <p>Ensembl API'dan pozisyonlar alınıyor...</p>
@@ -429,9 +430,12 @@ async def read_root():
             async function fetchPositions() {
                 const genes = document.getElementById('genes').value.trim();
                 if (!genes) {
-                    showError('Lütfen en az bir gen sembolü girin.');
+                    showError('Lutfen en az bir gen sembolu girin.');
                     return;
                 }
+
+                // Reset steps 2, 3, 4
+                resetSteps();
 
                 showLoading(true);
                 hideMessages();
@@ -616,6 +620,26 @@ async def read_root():
                 }
             }
 
+            function resetSteps() {
+                // Hide and disable steps 2, 3, 4
+                ['step2', 'step3', 'step4'].forEach(stepId => {
+                    const step = document.getElementById(stepId);
+                    step.classList.add('hidden', 'disabled');
+                    step.classList.remove('active');
+                });
+
+                // Clear results
+                document.getElementById('resultsTable').innerHTML = '';
+                document.getElementById('nonStandardList').innerHTML = '';
+                document.getElementById('nonStandardSection').classList.add('hidden');
+                document.getElementById('previewSection').classList.add('hidden');
+                document.getElementById('comparisonBody').innerHTML = '';
+
+                // Reset gene arrays
+                foundGenes = [];
+                nonStandardGenes = [];
+            }
+
             function showLoading(show) {
                 document.getElementById('loading').classList.toggle('hidden', !show);
             }
@@ -720,7 +744,7 @@ async def generate_bed(
         output_path,
         media_type="text/plain",
         filename=output_filename,
-        background=lambda: os.unlink(output_path)
+        background=BackgroundTask(os.unlink, output_path)
     )
 
 
